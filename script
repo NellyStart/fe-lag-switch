@@ -220,4 +220,4 @@ end)
 -- Инициализация
 RunService.Heartbeat:Connect(updateMovement)
 updateSpeedDisplay()
-print("Optimized script loaded! Controls: Q - toggle, Space - up, Shift - down")
+print("Optimized script loaded! Controls: Q - toggle, Space - up, LeftControl - down")
