@@ -10,8 +10,8 @@ local anchoredParts = {}
 local isAnchoredMode = false
 local SPEED_MULTIPLIER = 100
 local BASE_STEP = 0.015
-local ASCENT_SPEED = 0.4
-local DESCENT_SPEED = 0.4
+local ASCENT_SPEED = 0.5
+local DESCENT_SPEED = 0.5
 local isJumping = false
 local isDescending = false
 
@@ -33,7 +33,7 @@ frame.Selectable = true
 frame.Parent = screenGui
 
 local dragHandle = Instance.new("TextLabel")
-dragHandle.Text = "GitHub: NellyStart (Press E for use)"
+dragHandle.Text = "GitHub: NellyStart (Press Q for use)"
 dragHandle.Size = UDim2.new(1, 0, 0, 20)
 dragHandle.TextColor3 = Color3.new(1, 1, 1)
 dragHandle.BackgroundTransparency = 0.5
@@ -191,11 +191,11 @@ end
 -- Обработчики ввода
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed then
-        if input.KeyCode == Enum.KeyCode.E then
+        if input.KeyCode == Enum.KeyCode.Q then
             toggleAnchoredMode()
         elseif input.KeyCode == Enum.KeyCode.Space then
             isJumping = true
-        elseif input.KeyCode == Enum.KeyCode.Q then
+        elseif input.KeyCode == Enum.KeyCode.Shift then
             isDescending = true
         end
     end
@@ -204,7 +204,7 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.Space then
         isJumping = false
-    elseif input.KeyCode == Enum.KeyCode.Q then
+    elseif input.KeyCode == Enum.KeyCode.Shift then
         isDescending = false
     end
 end)
@@ -220,4 +220,4 @@ end)
 -- Инициализация
 RunService.Heartbeat:Connect(updateMovement)
 updateSpeedDisplay()
-print("Optimized script loaded! Controls: E - toggle, Space - up, Q - down")
+print("Optimized script loaded! Controls: Q - toggle, Space - up, Shift - down")
