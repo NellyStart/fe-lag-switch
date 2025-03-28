@@ -195,7 +195,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             toggleAnchoredMode()
         elseif input.KeyCode == Enum.KeyCode.Space then
             isJumping = true
-        elseif input.KeyCode == Enum.KeyCode.Shift then
+        elseif input.KeyCode == Enum.KeyCode.LeftControl then
             isDescending = true
         end
     end
@@ -204,7 +204,7 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.KeyCode == Enum.KeyCode.Space then
         isJumping = false
-    elseif input.KeyCode == Enum.KeyCode.Shift then
+    elseif input.KeyCode == Enum.KeyCode.LeftControl then
         isDescending = false
     end
 end)
