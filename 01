@@ -3,21 +3,22 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+local playerName = player.Name
 local playerGui = player:WaitForChild("PlayerGui")
-local character = nil
+local character = player.Character or player.CharacterAdded:Wait()
 local anchoredParts = {}
 local isAnchoredMode = false
-local SPEED_MULTIPLIER = 16
+local SPEED_MULTIPLIER = 100
 local BASE_STEP = 0.02
-local ASCENT_SPEED = 0.15
-local DESCENT_SPEED = 0.15
+local ASCENT_SPEED = 0.33
+local DESCENT_SPEED = 0.33
 local isJumping = false
 local isDescending = false
 
--- Создаем интерфейс (перенесено до инициализации персонажа)
+-- Создаем интерфейс
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AnchoredMovementUI"
-screenGui.ResetOnSpawn = false -- Важно: GUI не будет пропадать после смерти
+screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
@@ -32,7 +33,7 @@ frame.Selectable = true
 frame.Parent = screenGui
 
 local dragHandle = Instance.new("TextLabel")
-dragHandle.Text = "GitHub: NellyStart (Press X for use)"
+dragHandle.Text = "GitHub: NellyStart (Press E for use)"
 dragHandle.Size = UDim2.new(1, 0, 0, 20)
 dragHandle.TextColor3 = Color3.new(1, 1, 1)
 dragHandle.BackgroundTransparency = 0.5
@@ -57,6 +58,10 @@ textBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 textBox.TextColor3 = Color3.new(1, 1, 1)
 textBox.Parent = frame
 
+-- Кэшированные функции
+local newCFrame = CFrame.new
+local newVector3 = Vector3.new
+
 local function updateSpeedDisplay()
     speedLabel.Text = "Speed Multiplier: "..SPEED_MULTIPLIER
     textBox.Text = tostring(SPEED_MULTIPLIER)
@@ -68,32 +73,54 @@ textBox.FocusLost:Connect(function(enterPressed)
         if newSpeed and newSpeed > 0 then
             SPEED_MULTIPLIER = newSpeed
             updateSpeedDisplay()
-            print("Speed changed to:", SPEED_MULTIPLIER)
         else
             textBox.Text = tostring(SPEED_MULTIPLIER)
         end
     end
 end)
 
-local function getCharacterParts()
+-- Находим модель игрока в Workspace
+local function findPlayerModel()
+    -- Сначала проверяем стандартное расположение (Player.Character)
+    if character and character.Name == playerName then
+        return character
+    end
+    
+    -- Если нет, ищем в Workspace
+    local playerModel = workspace:FindFirstChild(playerName)
+    if playerModel and playerModel:IsA("Model") then
+        return playerModel
+    end
+    
+    return nil
+end
+
+-- Получаем все BasePart из модели
+local function getPartsFromModel(model)
     local parts = {}
-    if character then
-        for _, child in ipairs(character:GetDescendants()) do
-            if child:IsA("BasePart") then
-                table.insert(parts, child)
-            end
+    if not model then return parts end
+    
+    for _, child in ipairs(model:GetDescendants()) do
+        if child:IsA("BasePart") then
+            table.insert(parts, child)
         end
     end
     return parts
 end
 
 local function toggleAnchoredMode()
-    if not character then return end
+    local playerModel = findPlayerModel()
+    if not playerModel then 
+        print("Player model not found!")
+        return 
+    end
     
     isAnchoredMode = not isAnchoredMode
-    anchoredParts = getCharacterParts()
+    anchoredParts = getPartsFromModel(playerModel)
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
+    local rootPart = playerModel:FindFirstChild("HumanoidRootPart") or 
+                     playerModel:FindFirstChild("Torso") or 
+                     playerModel:FindFirstChildWhichIsA("BasePart")
     if not rootPart then return end
     
     local rootCFrame = rootPart.CFrame
@@ -105,22 +132,26 @@ local function toggleAnchoredMode()
     
     for part, relativePos in pairs(partsRelative) do
         part.Anchored = isAnchoredMode
-        part.Velocity = Vector3.new()
-        part.RotVelocity = Vector3.new()
+        part.Velocity = newVector3()
+        part.RotVelocity = newVector3()
         
         if isAnchoredMode then
-            part.CFrame = rootCFrame * CFrame.new(relativePos)
+            part.CFrame = rootCFrame * newCFrame(relativePos)
         end
     end
     
-    print(string.format("Anchored mode: %s | Speed: %d (Step: %.3f)", 
-        isAnchoredMode, SPEED_MULTIPLIER, BASE_STEP * SPEED_MULTIPLIER))
+    print(string.format("Anchored mode: %s | Affected parts: %d", isAnchoredMode, #anchoredParts))
 end
 
 local function updateMovement(dt)
-    if not isAnchoredMode or not character then return end
+    if not isAnchoredMode or #anchoredParts == 0 then return end
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChildWhichIsA("BasePart")
+    local playerModel = findPlayerModel()
+    if not playerModel then return end
+    
+    local rootPart = playerModel:FindFirstChild("HumanoidRootPart") or 
+                     playerModel:FindFirstChild("Torso") or 
+                     playerModel:FindFirstChildWhichIsA("BasePart")
     if not rootPart then return end
     
     local rootPos = rootPart.Position
@@ -129,10 +160,9 @@ local function updateMovement(dt)
         partsRelative[part] = part.Position - rootPos
     end
     
-    local moveVector = Vector3.new()
+    local moveVector = newVector3()
+    local humanoid = playerModel:FindFirstChildOfClass("Humanoid")
     
-    -- Горизонтальное движение (R6 совместимость)
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         local moveDirection = humanoid.MoveDirection
         if moveDirection.Magnitude > 0 then
@@ -140,29 +170,28 @@ local function updateMovement(dt)
         end
     end
     
-    -- Вертикальное движение
     if isJumping then
-        moveVector = moveVector + Vector3.new(0, ASCENT_SPEED, 0)
+        moveVector = moveVector + newVector3(0, ASCENT_SPEED, 0)
     end
     
     if isDescending then
-        moveVector = moveVector + Vector3.new(0, -DESCENT_SPEED, 0)
+        moveVector = moveVector + newVector3(0, -DESCENT_SPEED, 0)
     end
     
     if moveVector.Magnitude > 0 then
         local newRootPos = rootPos + moveVector
-        rootPart.CFrame = CFrame.new(newRootPos, newRootPos + moveVector)
+        rootPart.CFrame = newCFrame(newRootPos, newRootPos + moveVector)
         
         for part, relativePos in pairs(partsRelative) do
-            part.CFrame = CFrame.new(newRootPos + relativePos)
+            part.CFrame = newCFrame(newRootPos + relativePos)
         end
     end
 end
 
--- Обработчики ввода (изменено на X)
+-- Обработчики ввода
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed then
-        if input.KeyCode == Enum.KeyCode.X then
+        if input.KeyCode == Enum.KeyCode.E then
             toggleAnchoredMode()
         elseif input.KeyCode == Enum.KeyCode.Space then
             isJumping = true
@@ -180,42 +209,15 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Обработчик смены персонажа
+-- Обновляем модель при изменении персонажа
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     if isAnchoredMode then
-        anchoredParts = getCharacterParts()
-        for _, part in ipairs(anchoredParts) do
-            part.Anchored = true
-            part.Velocity = Vector3.new()
-            part.RotVelocity = Vector3.new()
-        end
+        toggleAnchoredMode()
     end
 end)
 
--- Инициализация персонажа
-if player.Character then
-    character = player.Character
-end
-
+-- Инициализация
 RunService.Heartbeat:Connect(updateMovement)
 updateSpeedDisplay()
-print("Script loaded! Controls: X - toggle mode, Space - ascend, Q - descend")
-
---Send Notification
-local Players = game:GetService("Players")
-local StarterGui = game:GetService("StarterGui")
-
--- Создаем функцию для отображения оповещения
-local function sendNotification()
-    local message = "FE LagSwitch"
-    
-    -- Отправляем уведомление всем игрокам
-    StarterGui:SetCore("SendNotification", {
-        Title = "Press X",
-        Text = message,
-        Duration = 6 -- Продолжительность уведомления в секундах
-    })
-end
-
--- Вызываем функцию
+print("Optimized script loaded! Controls: E - toggle, Space - up, Q - down")
